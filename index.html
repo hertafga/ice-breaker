@@ -42,10 +42,9 @@
   .hinttext{font-size:14px;max-width:430px}
   .note{font-size:12px;opacity:.7;margin-top:6px}
 
-  /* Responsif: tumpuk jadi 1 kolom di layar kecil */
   @media (max-width:900px){ .board{grid-template-columns: 1fr} }
 
-  /* input numerik tak terlihat (harus tetap "ada" supaya iOS/Android memunculkan keyboard) */
+  /* input numerik tak terlihat — tetap dapat fokus agar keyboard HP muncul */
   #numInput{
     position:absolute; left:8px; top:8px; width:1px; height:1px;
     opacity:0; border:0; padding:0; background:transparent;
@@ -64,14 +63,11 @@
   <div class="board">
     <!-- LOCK -->
     <div class="lock" id="lockArea" aria-label="Lock">
-      <!-- input kecil tak terlihat untuk memunculkan keyboard numerik HP saat slot dipilih -->
       <input id="numInput" type="tel" inputmode="numeric" pattern="[0-9]*"
              autocomplete="one-time-code" enterkeyhint="done" aria-hidden="true"/>
 
       <svg width="100%" height="150" style="position:absolute;left:0;top:10px;pointer-events:none">
-        <!-- shackle -->
         <path d="M170,120 A120,120 0 0,1 370,120" fill="none" stroke="#111" stroke-width="10"/>
-        <!-- body -->
         <rect x="60" y="140" width="420" height="120" rx="10" fill="#111"></rect>
         <rect x="74" y="154" width="392" height="92" rx="8" fill="#fff"></rect>
       </svg>
@@ -92,8 +88,7 @@
 </div>
 
 <script>
-  // ====== Konfigurasi ======
-  const SOLUTION = [0,5,2]; // ubah kalau mau
+  const SOLUTION = [0,5,2];
 
   const hintData = [
     {digits:[6,8,2], text:"one number is correct and in the correct position"},
@@ -103,7 +98,6 @@
     {digits:[7,8,0], text:"one number is correct but in the wrong position"}
   ];
 
-  // ====== Render hints ======
   const hintsEl = document.getElementById('hints');
   hintData.forEach(row=>{
     const rowEl = document.createElement('div'); rowEl.className = 'row';
@@ -118,59 +112,59 @@
     rowEl.appendChild(cells); rowEl.appendChild(text); hintsEl.appendChild(rowEl);
   });
 
-  // ====== Lock input (keyboard sistem) ======
   const slots = [...document.querySelectorAll('.slot')];
   const msg = document.getElementById('msg');
-  const numInput = document.getElementById('numInput'); // input numerik “tak terlihat”
+  const numInput = document.getElementById('numInput');
   const code = ["","",""];
   let active = -1;
 
   function drawCode(){ slots.forEach((s,i)=>{ s.textContent = code[i]; }); }
+
   function setActive(i){
     active = i;
     slots.forEach((s,idx)=> s.classList.toggle('active', idx===i));
     if(i>=0){
-      // Fokuskan input guna memunculkan keyboard — dipanggil dari gesture (tap)
       numInput.value = "";
-      // Trik rAF membantu beberapa browser mobile untuk fokus stabil
+      // fokuskan input (dipanggil dari gesture tap)
       requestAnimationFrame(()=> numInput.focus({preventScroll:true}));
     }else{
       numInput.blur();
     }
   }
 
-  // Ketuk slot -> pilih & fokuskan input
+  // Ketuk slot -> pilih & fokus input
   slots.forEach(s=>{
     s.addEventListener('pointerup', ()=>{
       setActive(parseInt(s.dataset.idx,10));
     }, {passive:true});
   });
 
-  // Input angka dari keyboard HP (tiap event ambil digit terakhir, lalu kosongkan)
+  // ===== Input dari keyboard HP (melalui numInput) =====
   numInput.addEventListener('input', ()=>{
     if(active<0) setActive(0);
     const v = numInput.value.replace(/\D/g,'');
     if(!v) return;
     const ch = v[v.length-1];
     code[active] = ch; drawCode();
-    numInput.value = "";             // kosongkan agar event berikutnya selalu satu digit
-    if(active<2) setActive(active+1); // auto-maju
+    numInput.value = "";                 // kosongkan supaya event berikutnya tetap 1 digit
+    if(active<2) setActive(active+1);    // auto maju
   });
 
-  // Backspace dari keyboard HP
   numInput.addEventListener('keydown', (e)=>{
     if(e.key === 'Backspace'){
       if(active<0) return;
       if(code[active] !== ""){ code[active] = ""; drawCode(); }
       else if(active>0){ setActive(active-1); code[active] = ""; drawCode(); }
     }
-    // Panah kiri/kanan (jika ada keyboard hw)
     if(e.key === 'ArrowLeft')  setActive(Math.max(0, active-1));
     if(e.key === 'ArrowRight') setActive(Math.min(2, active+1));
   });
 
-  // Fallback: keyboard desktop juga tetap bisa
+  // ===== Fallback keyboard desktop =====
   document.addEventListener('keydown', (e)=>{
+    // 🔧 FIX: jika fokus di numInput, JANGAN proses di dokumen (hindari double input)
+    if (document.activeElement === numInput || e.target === numInput) return;
+
     if(active<0) return;
     if(/[0-9]/.test(e.key)){
       code[active] = e.key; drawCode();
@@ -182,7 +176,7 @@
     else if(e.key==='ArrowRight'){ setActive(Math.min(2, active+1)); }
   });
 
-  // ====== Buttons ======
+  // ===== Buttons =====
   document.getElementById('check').addEventListener('click', ()=>{
     if(code.some(v=>v==="")){
       msg.style.color = '#D43D3D';
